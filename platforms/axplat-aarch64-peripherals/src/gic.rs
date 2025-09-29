@@ -52,6 +52,10 @@ pub fn unregister_handler(irq_num: usize) -> Option<IrqHandler> {
 /// also acknowledges the interrupt controller after handling.
 pub fn handle_irq(_unused: usize) {
     let ack = TRAP_OP.ack();
+    if ack.is_special() {
+        return;
+    }
+
     debug!("Handling IRQ: {ack:?}");
 
     let irq_num = match ack {
@@ -60,9 +64,7 @@ pub fn handle_irq(_unused: usize) {
     };
 
     if !IRQ_HANDLER_TABLE.handle(irq_num.to_u32() as _) {
-        if !ack.is_special() {
-            warn!("Unhandled IRQ {:?}", irq_num);
-        }
+        warn!("Unhandled IRQ {:?}", irq_num);
     }
 
     if !ack.is_special() {
