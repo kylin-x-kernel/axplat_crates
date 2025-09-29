@@ -58,9 +58,13 @@ pub fn handle_irq(_unused: usize) {
         Ack::Other(intid) => intid,
         Ack::SGI { intid, cpu_id: _ } => intid,
     };
+
     if !IRQ_HANDLER_TABLE.handle(irq_num.to_u32() as _) {
-        warn!("Unhandled IRQ {:?}", irq_num);
+        if !ack.is_special() {
+            warn!("Unhandled IRQ {:?}", irq_num);
+        }
     }
+
     if !ack.is_special() {
         TRAP_OP.eoi(ack);
         if TRAP_OP.eoi_mode_ns() {
