@@ -11,6 +11,11 @@ license.workspace = true
 homepage.workspace = true
 repository.workspace = true
 
+[features]
+default = ["gicv2"]
+gicv2 = []
+gicv3 = []
+
 [dependencies]
 kspin = "0.1"
 log = "0.4"
