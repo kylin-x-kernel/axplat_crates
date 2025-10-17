@@ -62,7 +62,7 @@ pub fn init_early(uart_base: VirtAddr) {
 /// Default implementation of [`axplat::console::ConsoleIf`] using the
 /// 16550a UART.
 #[macro_export]
-macro_rules! console_if_impl {
+macro_rules! ns16550_console_if_impl {
     ($name:ident) => {
         struct $name;
 
