@@ -54,7 +54,7 @@ pub fn init_early(uart_base: VirtAddr) {
     UART.init_once(SpinNoIrq::new({
         let base_addr = uart_base.as_usize();
         let mut uart = unsafe { MmioSerialPort::new(base_addr) };
-        uart.init();
+        //uart.init();
         uart
     }));
 }
