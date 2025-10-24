@@ -185,6 +185,7 @@ dependencies = [
  "log",
  "page_table_entry",
  "spin 0.10.0",
+ "uart_16550",
 ]
 
 [[package]]
