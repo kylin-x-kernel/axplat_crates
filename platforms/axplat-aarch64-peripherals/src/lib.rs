@@ -8,5 +8,6 @@ pub mod generic_timer;
 #[cfg(feature = "irq")]
 pub mod gic;
 pub mod pl011;
+pub mod ns16550a;
 pub mod pl031;
 pub mod psci;

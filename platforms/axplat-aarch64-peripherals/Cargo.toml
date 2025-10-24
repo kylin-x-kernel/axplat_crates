@@ -13,6 +13,10 @@ repository.workspace = true
 
 [features]
 irq = ["axplat/irq"]
+default = ["gicv2"]
+gicv2 = []
+gicv3 = []
+crosvm = []
 
 [dependencies]
 kspin = "0.1"
@@ -24,6 +28,7 @@ page_table_entry = "0.5"
 aarch64-cpu = "10.0"
 arm_pl011 = "0.1"
 arm-gic-driver = "0.15"
+uart_16550 = "0.4"
 arm_pl031 = "0.2"
 axcpu = { workspace = true }
 axplat = { workspace = true }

@@ -1,6 +1,10 @@
 //! ARM Generic Interrupt Controller (GIC).
 
-use arm_gic_driver::v2::{Ack, Gic, IntId, SGITarget, TargetList, TrapOp, Trigger, VirtAddr};
+#[cfg(feature = "gicv2")]
+use arm_gic_driver::v2::{Ack, Gic, IntId, SGITarget, TargetList, TrapOp, VirtAddr};
+#[cfg(feature = "gicv3")]
+use arm_gic_driver::v3::*;
+
 use axplat::irq::{HandlerTable, IpiTarget, IrqHandler};
 use kspin::SpinNoIrq;
 use lazyinit::LazyInit;
@@ -54,7 +58,7 @@ pub fn unregister_handler(irq: usize) -> Option<IrqHandler> {
 /// It is called by the common interrupt handler. It should look up in the
 /// IRQ handler table and calls the corresponding handler. If necessary, it
 /// also acknowledges the interrupt controller after handling.
-pub fn handle_irq(_irq: usize) -> Option<usize> {
+pub fn handle_irq(_unused: usize) -> Option<usize> {
     let ack = TRAP_OP.ack();
 
     if ack.is_special() {
@@ -81,7 +85,29 @@ pub fn handle_irq(_irq: usize) -> Option<usize> {
     Some(irq)
 }
 
+#[cfg(feature = "gicv3")]
+pub fn handle_irq(_unused: usize) -> Option<usize> {
+    let ack = TRAP_OP.ack1();
+    if ack.is_special() {
+        return;
+    }
+
+    trace!("Handling IRQ: {ack:?}");
+
+    if !IRQ_HANDLER_TABLE.handle(ack.to_u32() as _) {
+        warn!("Unhandled IRQ {:?}", ack);
+    }
+
+    TRAP_OP.eoi1(ack);
+    if TRAP_OP.eoi_mode() {
+        TRAP_OP.dir(ack);
+    }
+
+    Some(ack.to_u32() as usize)
+}
+
 /// Initializes GIC
+#[cfg(feature = "gicv2")]
 pub fn init_gic(gicd_base: axplat::mem::VirtAddr, gicc_base: axplat::mem::VirtAddr) {
     info!("Initialize GICv2...");
     let gicd_base = VirtAddr::new(gicd_base.into());
@@ -95,9 +121,26 @@ pub fn init_gic(gicd_base: axplat::mem::VirtAddr, gicc_base: axplat::mem::VirtAd
     TRAP_OP.init_once(cpu.trap_operations());
 }
 
+/// Initializes GIC
+#[cfg(feature = "gicv3")]
+pub fn init_gic(gicd_base: axplat::mem::VirtAddr, gicr_base: axplat::mem::VirtAddr) {
+    info!("Initialize GICv3...");
+    let gicd_base = VirtAddr::new(gicd_base.into());
+    let gicr_base = VirtAddr::new(gicr_base.into());
+
+    let mut gic = unsafe { Gic::new(gicd_base, gicr_base) };
+    // crosvm not use this to init, there is a panic
+    #[cfg(not(feature = "crosvm"))]
+    gic.init();
+    GIC.init_once(SpinNoIrq::new(gic));
+    let cpu = GIC.lock().cpu_interface();
+    TRAP_OP.init_once(cpu.trap_operations());
+}
+
 /// Initializes GICC (for all CPUs).
 ///
 /// It must be called after [`init_gic`].
+#[cfg(feature = "gicv2")]
 pub fn init_gicc() {
     debug!("Initialize GIC CPU Interface...");
     let mut cpu = GIC.lock().cpu_interface();
@@ -105,7 +148,17 @@ pub fn init_gicc() {
     cpu.set_eoi_mode_ns(false);
 }
 
+/// Initializes GICR (for all CPUs).
+#[cfg(feature = "gicv3")]
+pub fn init_gicr() {
+    debug!("Initialize GIC CPU Interface...");
+    let mut cpu = GIC.lock().cpu_interface();
+    let _ = cpu.init_current_cpu();
+    cpu.set_eoi_mode(false);
+}
+
 /// Sends an inter-processor interrupt (IPI) to the specified target CPU or all CPUs.
+#[cfg(feature = "gicv2")]
 pub fn send_ipi(irq_num: usize, target: IpiTarget) {
     match target {
         IpiTarget::Current { cpu_id: _ } => {
@@ -128,6 +181,32 @@ pub fn send_ipi(irq_num: usize, target: IpiTarget) {
         }
     }
 }
+
+#[cfg(feature = "gicv3")]
+pub fn send_ipi(irq_num: usize, target: IpiTarget) {
+    match target {
+        IpiTarget::Current { cpu_id: _ } => {
+            GIC.lock().cpu_interface()
+                .send_sgi(IntId::sgi(irq_num as u32), SGITarget::current());
+            }
+        IpiTarget::Other { cpu_id } => {
+            let affinity = Affinity::from_mpidr(cpu_id as u64);
+            let target_list = TargetList::new([affinity]);
+            GIC.lock().cpu_interface().send_sgi(
+                IntId::sgi(irq_num as u32),
+                SGITarget::List(target_list),
+            );
+        }
+        IpiTarget::AllExceptCurrent {
+            cpu_id: _,
+            cpu_num: _,
+        } => {
+            GIC.lock().cpu_interface()
+                .send_sgi(IntId::sgi(irq_num as u32), SGITarget::All);
+        }
+    }
+}
+
 
 /// Default implementation of [`axplat::irq::IrqIf`] using the GIC.
 #[macro_export]
