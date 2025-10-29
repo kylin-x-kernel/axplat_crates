@@ -1,7 +1,7 @@
 //! ARM Generic Interrupt Controller (GIC).
 
 #[cfg(feature = "gicv2")]
-use arm_gic_driver::v2::{Ack, Gic, IntId, SGITarget, TargetList, TrapOp, VirtAddr};
+use arm_gic_driver::v2::*;
 #[cfg(feature = "gicv3")]
 use arm_gic_driver::v3::*;
 
@@ -17,6 +17,18 @@ static GIC: LazyInit<SpinNoIrq<Gic>> = LazyInit::new();
 static TRAP_OP: LazyInit<TrapOp> = LazyInit::new();
 
 static IRQ_HANDLER_TABLE: HandlerTable<MAX_IRQ_COUNT> = HandlerTable::new();
+
+/// set trigger type of given IRQ
+pub fn set_trigger(irq_num: usize, edge: bool) {
+    trace!("GIC set trigger: {} {}", irq_num, edge);
+    let intid = unsafe { IntId::raw(irq_num as u32) };
+    let cfg = if edge {
+        Trigger::Edge
+    } else {
+        Trigger::Level
+    };
+    GIC.lock().set_cfg(intid, cfg);
+}
 
 /// Enables or disables the given IRQ.
 pub fn set_enable(irq_num: usize, enabled: bool) {
