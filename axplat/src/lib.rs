@@ -13,6 +13,7 @@ pub mod mem;
 pub mod percpu;
 pub mod power;
 pub mod time;
+pub mod psci;
 
 pub use axplat_macros::main;
 pub use crate_interface::impl_interface as impl_plat_interface;
