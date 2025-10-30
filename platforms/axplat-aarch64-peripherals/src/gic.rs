@@ -134,8 +134,6 @@ pub fn init_gic(gicd_base: axplat::mem::VirtAddr, gicr_base: axplat::mem::VirtAd
     let gicr_base = VirtAddr::new(gicr_base.into());
 
     let mut gic = unsafe { Gic::new(gicd_base, gicr_base) };
-    // crosvm not use this to init, there is a panic
-    #[cfg(not(feature = "crosvm"))]
     gic.init();
     GIC.init_once(SpinNoIrq::new(gic));
     let cpu = GIC.lock().cpu_interface();
