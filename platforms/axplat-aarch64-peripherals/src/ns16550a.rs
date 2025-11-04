@@ -1,5 +1,4 @@
 //! NS16550A UART driver.
-
 use uart_16550::{MmioSerialPort,WouldBlockError};
 use axplat::mem::VirtAddr;
 use kspin::SpinNoIrq;
@@ -10,10 +9,11 @@ static UART: LazyInit<SpinNoIrq<MmioSerialPort>> = LazyInit::new();
 fn do_putchar(uart: &mut MmioSerialPort, c: u8) {
     match c {
         b'\n' => {
-            uart.send(b'\r');  
+            uart.send(b'\r');
             uart.send(b'\n');
         }
-        c => uart.send(c),     
+        c => uart.send(c),
+    }
 }
 
 /// Writes a byte to the console.
@@ -52,9 +52,40 @@ pub fn read_bytes(bytes: &mut [u8]) -> usize {
 /// Early stage initialization of the NS16550A UART driver.
 pub fn init_early(uart_base: VirtAddr) {
     UART.init_once(SpinNoIrq::new({
-        let base_addr = uart_base.as_usize(); 
+        let base_addr = uart_base.as_usize();
         let mut uart = unsafe { MmioSerialPort::new(base_addr) };
         uart.init();
         uart
     }));
+}
+
+/// Default implementation of [`axplat::console::ConsoleIf`] using the
+/// 16550a UART.
+#[macro_export]
+macro_rules! ns16550_console_if_impl {
+    ($name:ident) => {
+        struct $name;
+
+        #[axplat::impl_plat_interface]
+        impl axplat::console::ConsoleIf for $name {
+            /// Writes given bytes to the console.
+            fn write_bytes(bytes: &[u8]) {
+                $crate::ns16550a::write_bytes(bytes);
+            }
+
+            /// Reads bytes from the console into the given mutable slice.
+            ///
+            /// Returns the number of bytes read.
+            fn read_bytes(bytes: &mut [u8]) -> usize {
+                $crate::ns16550a::read_bytes(bytes)
+            }
+
+            /// Returns the IRQ number for the console, if applicable.
+            #[cfg(feature = "irq")]
+            fn irq_number() -> Option<u32> {
+                // Note that `crate` is not `$crate`!
+                Some(crate::config::devices::UART_IRQ as _)
+            }
+        }
+    };
 }
