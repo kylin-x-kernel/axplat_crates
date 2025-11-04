@@ -53,8 +53,8 @@ pub fn read_bytes(bytes: &mut [u8]) -> usize {
 pub fn init_early(uart_base: VirtAddr) {
     UART.init_once(SpinNoIrq::new({
         let base_addr = uart_base.as_usize();
-        let mut uart = unsafe { MmioSerialPort::new(base_addr) };
-        uart.init();
+        let uart = unsafe { MmioSerialPort::new(base_addr) };
+        //uart.init();
         uart
     }));
 }
