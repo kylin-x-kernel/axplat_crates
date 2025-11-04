@@ -1,6 +1,6 @@
 //! Psci interface.
 
-/// Console input and output interface.
+/// Power state coordination interface
 #[def_plat_interface]
 pub trait PsciIf {
     /// Tell host share dma buf between guest and host
