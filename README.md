@@ -21,3 +21,8 @@ Reusable crates used for [ArceOS](https://github.com/arceos-org/arceos) Hardware
 ## Utility crate
 
 * [cargo-axplat](./cargo-axplat): A cargo subcommand to manage hardware platform packages using [axplat](./axplat).
+
+
+## License
+
+This project is now released under the Apache License 2.0. All modifications and new contributions in our project are distributed under the same license. See the [LICENSE](./LICENSE) file for details.
