@@ -14,8 +14,8 @@ repository.workspace = true
 [features]
 irq = ["axplat/irq"]
 default = ["gicv2"]
-gicv2 = []
-gicv3 = []
+gicv2 = ["irq"]
+gicv3 = ["irq"]
 
 [dependencies]
 kspin = "0.1"

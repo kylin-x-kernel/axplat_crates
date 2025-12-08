@@ -41,7 +41,7 @@ pub fn set_trigger(irq_num: usize, edge: bool) {
 pub fn set_enable(irq: usize, enabled: bool) {
     trace!("GIC set enable: {irq} {enabled}");
     let intid = unsafe { IntId::raw(irq as u32) };
-    let gic = GIC.lock();
+    let mut gic = GIC.lock();
     gic.set_irq_enable(intid, enabled);
     if !intid.is_private() {
         gic.set_cfg(intid, Trigger::Edge);
@@ -77,6 +77,7 @@ pub fn unregister_handler(irq: usize) -> Option<IrqHandler> {
 /// It is called by the common interrupt handler. It should look up in the
 /// IRQ handler table and calls the corresponding handler. If necessary, it
 /// also acknowledges the interrupt controller after handling.
+#[cfg(feature = "gicv2")]
 pub fn handle_irq(_unused: usize) -> Option<usize> {
     let ack = TRAP_OP.ack();
 
@@ -108,7 +109,7 @@ pub fn handle_irq(_unused: usize) -> Option<usize> {
 pub fn handle_irq(_unused: usize) -> Option<usize> {
     let ack = TRAP_OP.ack1();
     if ack.is_special() {
-        return;
+        return None;
     }
 
     trace!("Handling IRQ: {ack:?}");

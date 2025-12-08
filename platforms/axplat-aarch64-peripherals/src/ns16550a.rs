@@ -82,7 +82,7 @@ macro_rules! ns16550_console_if_impl {
 
             /// Returns the IRQ number for the console, if applicable.
             #[cfg(feature = "irq")]
-            fn irq_number() -> Option<u32> {
+            fn irq_num() -> Option<usize> {
                 // Note that `crate` is not `$crate`!
                 Some(crate::config::devices::UART_IRQ as _)
             }
