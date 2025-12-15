@@ -90,6 +90,7 @@ pub fn set_priority(irq: usize, priority: u8) {
 /// priority lower than this mask will be ignored. This is useful for implementing
 /// priority-based interrupt masking.
 pub fn set_priority_mask(priority: u8) {
+    let mut gic = GIC.lock();
     gic.set_priority_mask(priority);
 }   
 
