@@ -91,7 +91,7 @@ pub fn set_priority(irq: usize, priority: u8) {
 /// priority-based interrupt masking.
 pub fn set_priority_mask(priority: u8) {
     let mut gic = GIC.lock();
-    gic.set_priority_mask(priority);
+    gic.cpu_interface().set_priority_mask(priority);
 }   
 
 /// Handles the IRQ.
