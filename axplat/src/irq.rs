@@ -58,4 +58,10 @@ pub trait IrqIf {
 
     /// Sends an inter-processor interrupt (IPI) to the specified target CPU or all CPUs.
     fn send_ipi(irq_num: usize, target: IpiTarget);
+
+    /// Sets the priority for a specific interrupt request (IRQ).
+    fn set_priority(irq: usize, priority: u8);
+
+    /// Sets the priority mask for the CPU interface.
+    fn set_priority_mask(priority: u8);
 }

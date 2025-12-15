@@ -72,6 +72,27 @@ pub fn unregister_handler(irq: usize) -> Option<IrqHandler> {
     IRQ_HANDLER_TABLE.unregister_handler(irq)
 }
 
+/// Sets the priority for a specific interrupt request (IRQ).
+///
+/// This function configures the priority level for the given IRQ number. Lower
+/// numerical values indicate higher priority. The priority value must be within
+/// the valid range supported by the interrupt controller.
+pub fn set_priority(irq: usize, priority: u8) {
+    let intid = unsafe { IntId::raw(irq as u32) };
+    let mut gic = GIC.lock();
+    gic.set_priority(intid, priority);
+}
+
+/// Sets the priority mask for the CPU interface.
+///
+/// This function configures the priority mask register (PMR) which determines
+/// the minimum priority level that can interrupt the processor. Interrupts with
+/// priority lower than this mask will be ignored. This is useful for implementing
+/// priority-based interrupt masking.
+pub fn set_priority_mask(priority: u8) {
+    gic.set_priority_mask(priority);
+}   
+
 /// Handles the IRQ.
 ///
 /// It is called by the common interrupt handler. It should look up in the
@@ -267,6 +288,16 @@ macro_rules! irq_if_impl {
             /// Sends an inter-processor interrupt (IPI) to the specified target CPU or all CPUs.
             fn send_ipi(irq_num: usize, target: axplat::irq::IpiTarget) {
                 $crate::gic::send_ipi(irq_num, target);
+            }
+
+            /// Sets the priority for a specific interrupt request (IRQ).
+            fn set_priority(irq: usize, priority: u8) {
+                $crate::gic::set_priority(irq, priority);
+            }
+
+            /// Sets the priority mask for the CPU interface.
+            fn set_priority_mask(priority: u8) {
+                $crate::gic::set_priority_mask(priority);
             }
         }
     };
