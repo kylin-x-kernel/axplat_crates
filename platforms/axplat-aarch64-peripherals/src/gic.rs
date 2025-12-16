@@ -79,7 +79,7 @@ pub fn unregister_handler(irq: usize) -> Option<IrqHandler> {
 /// the valid range supported by the interrupt controller.
 pub fn set_priority(irq: usize, priority: u8) {
     let intid = unsafe { IntId::raw(irq as u32) };
-    let mut gic = GIC.lock();
+    let gic = GIC.lock();
     gic.set_priority(intid, priority);
 }
 
@@ -90,7 +90,7 @@ pub fn set_priority(irq: usize, priority: u8) {
 /// priority lower than this mask will be ignored. This is useful for implementing
 /// priority-based interrupt masking.
 pub fn set_priority_mask(priority: u8) {
-    let mut gic = GIC.lock();
+    let gic = GIC.lock();
     gic.cpu_interface().set_priority_mask(priority);
 }   
 
