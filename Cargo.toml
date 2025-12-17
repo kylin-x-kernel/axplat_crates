@@ -36,6 +36,6 @@ homepage = "https://github.com/arceos-org/arceos"
 repository = "https://github.com/arceos-org/axplat_crates"
 
 [workspace.dependencies]
-axcpu = { git = "https://github.com/kylin-x-kernel/axcpu.git", branch = "gic-priority-mask", features = ["pmr"]}
+axcpu = { git = "https://github.com/kylin-x-kernel/axcpu.git", branch = "dev"}
 axplat = { version = "0.3.0", path = "./axplat" }
 axplat-macros = { version = "0.1.0", path = "./axplat-macros" }
