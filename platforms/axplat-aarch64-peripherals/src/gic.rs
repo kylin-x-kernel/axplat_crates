@@ -13,6 +13,8 @@ use arm_gic_driver::v2::*;
 use arm_gic_driver::v3::*;
 
 use axplat::irq::{HandlerTable, IpiTarget, IrqHandler};
+use core::arch::asm;
+use aarch64_cpu::registers::{DAIF, Readable};
 use kspin::SpinNoIrq;
 use lazyinit::LazyInit;
 
@@ -92,6 +94,17 @@ pub fn set_priority(irq: usize, priority: u8) {
 pub fn set_priority_mask(priority: u8) {
     let gic = GIC.lock();
     gic.cpu_interface().set_priority_mask(priority);
+}   
+
+/// Gets the current priority mask of the CPU interface.
+///
+/// This function reads the priority mask register (PMR) of the GIC CPU interface.
+/// The PMR defines the minimum interrupt priority level that is allowed to be
+/// signaled to the processor. Interrupts with a priority value numerically
+/// greater than the PMR are masked and will not be delivered to the CPU.
+pub fn get_priority_mask() -> u8 {
+    let gic = GIC.lock();
+    gic.cpu_interface().get_priority_mask()
 }   
 
 /// Handles the IRQ.
@@ -247,6 +260,93 @@ pub fn send_ipi(irq_num: usize, target: IpiTarget) {
     }
 }
 
+/// Allows the current CPU to respond to interrupts.
+///
+/// In AArch64, it unmasks IRQs by clearing the I bit in the `DAIF` register.
+#[cfg(not(feature = "pmr"))]
+#[inline]
+pub fn enable_irqs() {
+    // Default implementation: via DAIF register
+    unsafe { asm!("msr daifclr, #2") };
+}
+
+/// Makes the current CPU ignore interrupts.
+///
+/// In AArch64, it masks IRQs by setting the I bit in the `DAIF` register.
+#[cfg(not(feature = "pmr"))]
+#[inline]
+pub fn disable_irqs() {
+    // Default implementation: via DAIF register
+    unsafe { asm!("msr daifset, #2") };
+}
+
+/// Returns whether the current CPU is allowed to respond to interrupts.
+///
+/// In AArch64, it checks the I bit in the `DAIF` register.
+#[cfg(not(feature = "pmr"))]
+#[inline]
+pub fn irqs_enabled() -> bool {
+    !DAIF.matches_all(DAIF::I::Masked)
+}
+
+/// Allows the current CPU to respond to interrupts.
+///
+/// In AArch64, it unmasks IRQs by setting the priority mask to 0xFF
+/// (lowest priority) in the `ICC_PMR_EL1` register.
+#[cfg(feature = "pmr")]
+#[inline]
+pub fn enable_irqs() {
+    // Use GIC priority mask control
+    set_priority_mask(0xff);
+    // Optional: also clear the I bit in DAIF register
+    unsafe { asm!("msr daifclr, #2") };
+}
+
+/// Makes the current CPU ignore interrupts.
+///
+/// In AArch64, it masks IRQs by setting the priority mask to 0x80
+/// (high priority) in the `ICC_PMR_EL1` register.
+#[cfg(feature = "pmr")]
+#[inline]
+pub fn disable_irqs() {
+    set_priority_mask(0x80);
+    // Optional: also clear the I bit in DAIF register
+    unsafe { asm!("msr daifclr, #2") };
+}
+
+/// Returns whether the current CPU is allowed to respond to interrupts.
+#[cfg(feature = "pmr")]
+#[inline]
+pub fn irqs_enabled() -> bool {
+    (!DAIF.matches_all(DAIF::I::Masked)) && get_priority_mask() > 0xa0
+}
+
+#[cfg(not(feature = "pmr"))]
+#[inline]
+pub fn local_irq_save() -> usize {
+    let flags: usize;
+    // save `DAIF` flags
+    unsafe { asm!("mrs {}, daif", out(reg) flags) };
+    flags
+}
+
+#[cfg(not(feature = "pmr"))]
+#[inline]
+pub fn local_irq_restore(flags: usize) {
+    unsafe { asm!("msr daif, {}", in(reg) flags) };
+}
+
+#[cfg(feature = "pmr")]
+#[inline]
+pub fn local_irq_save() -> usize {
+    get_priority_mask() as usize
+}
+
+#[cfg(feature = "pmr")]
+#[inline]
+pub fn local_irq_restore(flags: usize) {
+    set_priority_mask(flags as u8);
+}
 
 /// Default implementation of [`axplat::irq::IrqIf`] using the GIC.
 #[macro_export]
@@ -296,9 +396,31 @@ macro_rules! irq_if_impl {
                 $crate::gic::set_priority(irq, priority);
             }
 
-            /// Sets the priority mask for the CPU interface.
-            fn set_priority_mask(priority: u8) {
-                $crate::gic::set_priority_mask(priority);
+            /// Save irq status and disable
+            fn local_irq_save_and_disable() -> usize {
+                let pm = $crate::gic::local_irq_save();
+                $crate::gic::disable_irqs();
+                pm
+            }
+
+            /// Restore irq status
+            fn local_irq_restore(flag: usize) {
+                $crate::gic::local_irq_restore(flag);
+            }
+
+            /// Allows the current CPU to respond to interrupts.
+            fn enable_irqs(){
+                $crate::gic::enable_irqs();
+            }
+
+            /// Makes the current CPU ignore interrupts.
+            fn disable_irqs(){
+                $crate::gic::disable_irqs();
+            }
+
+            /// Returns whether the current CPU is allowed to respond to interrupts.
+            fn irq_enabled() -> bool {
+                $crate::gic::irqs_enabled()
             }
         }
     };

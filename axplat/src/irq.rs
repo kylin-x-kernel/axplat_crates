@@ -62,6 +62,18 @@ pub trait IrqIf {
     /// Sets the priority for a specific interrupt request (IRQ).
     fn set_priority(irq: usize, priority: u8);
 
-    /// Sets the priority mask for the CPU interface.
-    fn set_priority_mask(priority: u8);
+    /// Save irq status and disable
+    fn local_irq_save_and_disable() -> usize;
+
+    /// Restore irq status
+    fn local_irq_restore(flag: usize);
+    
+    /// Allows the current CPU to respond to interrupts.
+    fn enable_irqs();
+
+    /// Makes the current CPU ignore interrupts.
+    fn disable_irqs();
+
+    /// Returns whether the current CPU is allowed to respond to interrupts.
+    fn irq_enabled() -> bool;
 }

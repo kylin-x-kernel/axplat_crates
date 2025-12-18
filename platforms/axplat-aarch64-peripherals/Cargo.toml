@@ -16,6 +16,7 @@ irq = ["axplat/irq"]
 default = ["gicv2"]
 gicv2 = ["irq"]
 gicv3 = ["irq"]
+pmr = []
 
 [dependencies]
 kspin = "0.1"
