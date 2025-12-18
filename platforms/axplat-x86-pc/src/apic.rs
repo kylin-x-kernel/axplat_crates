@@ -209,7 +209,7 @@ mod irq_impl {
     }
 
     /// Returns whether the current CPU is allowed to respond to interrupts.
-    fn irq_enabled() -> bool {
+    fn irqs_enabled() -> bool {
         todo!()
     }
 }

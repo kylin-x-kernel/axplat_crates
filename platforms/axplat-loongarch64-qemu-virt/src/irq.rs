@@ -141,12 +141,12 @@ impl IrqIf for IrqIfImpl {
     }
 
     /// Save irq status and disable
-    pub fn local_irq_save_and_disable() -> usize {
+    fn local_irq_save_and_disable() -> usize {
         todo!()
     }
 
     /// Restore irq status
-    pub fn local_irq_restore(flag: usize) {
+    fn local_irq_restore(flag: usize) {
          todo!()
     }
 
@@ -161,7 +161,7 @@ impl IrqIf for IrqIfImpl {
     }
 
     /// Returns whether the current CPU is allowed to respond to interrupts.
-    fn irq_enabled() -> bool {
+    fn irqs_enabled() -> bool {
         todo!()
     }
 }

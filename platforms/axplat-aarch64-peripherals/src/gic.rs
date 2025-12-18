@@ -419,7 +419,7 @@ macro_rules! irq_if_impl {
             }
 
             /// Returns whether the current CPU is allowed to respond to interrupts.
-            fn irq_enabled() -> bool {
+            fn irqs_enabled() -> bool {
                 $crate::gic::irqs_enabled()
             }
         }

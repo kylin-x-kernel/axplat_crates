@@ -75,5 +75,5 @@ pub trait IrqIf {
     fn disable_irqs();
 
     /// Returns whether the current CPU is allowed to respond to interrupts.
-    fn irq_enabled() -> bool;
+    fn irqs_enabled() -> bool;
 }
