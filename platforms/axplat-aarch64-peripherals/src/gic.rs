@@ -408,7 +408,7 @@ macro_rules! irq_if_impl {
 
             /// Save irq status and disable
             fn local_irq_save_and_disable() -> usize {
-                $crate::gic::local_irq_save_and_disable()
+                $crate::gic::local_irq_save_and_disable();
                 pm
             }
 
