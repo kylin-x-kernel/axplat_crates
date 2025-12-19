@@ -334,28 +334,44 @@ pub fn disable_irqs() {
 #[cfg(feature = "pmr")]
 #[inline]
 pub fn irqs_enabled() -> bool {
-    let pmr = unsafe {core::ptr::read_volatile((GICC_PMR) as *const u32) as u8};
-    (!DAIF.matches_all(DAIF::I::Masked)) && pmr > 0xa0
+    (!DAIF.matches_all(DAIF::I::Masked)) && get_priority_mask() > 0xa0
 }
 
-#[cfg(feature = "pmr")]
-const GICC_PMR: usize = 0xffff_0000_0800_0004;
-
+/// Save the current interrupt state and disable IRQs.
+///
+/// This function may be called during early boot, before the GIC CPU interface
+/// is initialized. In that case, it falls back to manipulating the DAIF register
+/// directly to mask IRQs.
+///
+/// After the GIC has been initialized, IRQ masking is performed via the GIC
+/// priority mask (PMR) instead.
 #[cfg(feature = "pmr")]
 #[inline]
 pub fn local_irq_save_and_disable() -> usize {
-    let pmr = unsafe {core::ptr::read_volatile((GICC_PMR) as *const u32) as u8};
-    unsafe {
-        core::ptr::write_volatile((GICC_PMR) as *mut u32, 0x80u32);
+    if GIC.is_inited() {
+        let pmr = get_priority_mask() as usize;
+        disable_irqs();
+        pmr
+    } else {
+        let flags: usize;
+        // Save DAIF and mask IRQs via the I bit (early boot path)
+        unsafe { asm!("mrs {}, daif; msr daifset, #2", out(reg) flags) };
+        flags
     }
-    pmr as usize
 }
 
+/// Restore the interrupt state saved by [`local_irq_save_and_disable`].
+///
+/// If the GIC has already been initialized, the saved value is interpreted as a
+/// GIC priority mask and restored via the PMR. Otherwise, the saved DAIF value
+/// is written back directly (early boot path).
 #[cfg(feature = "pmr")]
 #[inline]
 pub fn local_irq_restore(flags: usize) {
-    unsafe {
-        core::ptr::write_volatile((GICC_PMR) as *mut u32, flags as u8 as u32);
+    if GIC.is_inited() {
+        set_priority_mask(flags as u8);
+    } else {
+        unsafe { asm!("msr daif, {}", in(reg) flags) };
     }
 }
 
