@@ -334,7 +334,8 @@ pub fn disable_irqs() {
 #[cfg(feature = "pmr")]
 #[inline]
 pub fn irqs_enabled() -> bool {
-    (!DAIF.matches_all(DAIF::I::Masked)) && get_priority_mask() > 0xa0
+    let pmr = unsafe {core::ptr::read_volatile((GICC_PMR) as *const u32) as u8};
+    (!DAIF.matches_all(DAIF::I::Masked)) && pmr > 0xa0
 }
 
 #[cfg(feature = "pmr")]
