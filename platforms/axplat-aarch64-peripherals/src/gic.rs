@@ -307,35 +307,56 @@ pub fn local_irq_restore(flags: usize) {
 
 /// Allows the current CPU to respond to interrupts.
 ///
-/// In AArch64, it unmasks IRQs by setting the priority mask to 0xFF
-/// (lowest priority) in the `ICC_PMR_EL1` register.
+/// When the GIC CPU interface is not initialized yet (early boot),
+/// fall back to DAIF-based IRQ unmasking.
+/// After GIC initialization, IRQ masking/unmasking is controlled
+/// via the GIC priority mask (PMR).
 #[cfg(feature = "pmr")]
 #[inline]
 pub fn enable_irqs() {
-    // Use GIC priority mask control
-    set_priority_mask(0xff);
-    // Optional: also clear the I bit in DAIF register
-    unsafe { asm!("msr daifclr, #2") };
+    if GIC.is_inited() {
+        // Early boot: GIC CPU interface not ready, use DAIF directly
+        unsafe { asm!("msr daifclr, #2") };
+    } else {
+        // Normal path: unmask all IRQ priorities via GIC PMR
+        set_priority_mask(0xff);
+        unsafe { asm!("msr daifclr, #2") };
+    }
 }
 
 /// Makes the current CPU ignore interrupts.
 ///
-/// In AArch64, it masks IRQs by setting the priority mask to 0x80
-/// (high priority) in the `ICC_PMR_EL1` register.
+/// During early boot, IRQs are masked using DAIF.
+/// Once the GIC CPU interface is initialized, IRQ masking is done
+/// via the GIC priority mask (PMR).
 #[cfg(feature = "pmr")]
 #[inline]
 pub fn disable_irqs() {
-    set_priority_mask(0x80);
-    // Optional: also clear the I bit in DAIF register
-    unsafe { asm!("msr daifclr, #2") };
+    if GIC.is_inited() {
+        // Early boot: mask IRQs via DAIF
+        unsafe { asm!("msr daifset, #2") };
+    } else {
+        // Normal path: raise GIC priority mask to block IRQs
+        set_priority_mask(0x80);
+        unsafe { asm!("msr daifclr, #2") };
+    }
 }
 
 /// Returns whether the current CPU is allowed to respond to interrupts.
+///
+/// In early boot, this is determined solely by the DAIF register.
+/// After GIC initialization, both DAIF and the GIC priority mask
+/// are considered.
 #[cfg(feature = "pmr")]
 #[inline]
 pub fn irqs_enabled() -> bool {
-    (!DAIF.matches_all(DAIF::I::Masked)) && get_priority_mask() > 0xa0
+    if GIC.is_inited() {
+        !DAIF.matches_all(DAIF::I::Masked)
+    } else {
+        !DAIF.matches_all(DAIF::I::Masked) && get_priority_mask() > 0xa0
+    }
 }
+
 
 /// Save the current interrupt state and disable IRQs.
 ///
