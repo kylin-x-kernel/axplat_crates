@@ -314,7 +314,7 @@ pub fn local_irq_restore(flags: usize) {
 #[cfg(feature = "pmr")]
 #[inline]
 pub fn enable_irqs() {
-    if GIC.is_inited() {
+    if !GIC.is_inited() {
         // Early boot: GIC CPU interface not ready, use DAIF directly
         unsafe { asm!("msr daifclr, #2") };
     } else {
@@ -332,7 +332,7 @@ pub fn enable_irqs() {
 #[cfg(feature = "pmr")]
 #[inline]
 pub fn disable_irqs() {
-    if GIC.is_inited() {
+    if !GIC.is_inited() {
         // Early boot: mask IRQs via DAIF
         unsafe { asm!("msr daifset, #2") };
     } else {
@@ -350,7 +350,7 @@ pub fn disable_irqs() {
 #[cfg(feature = "pmr")]
 #[inline]
 pub fn irqs_enabled() -> bool {
-    if GIC.is_inited() {
+    if !GIC.is_inited() {
         !DAIF.matches_all(DAIF::I::Masked)
     } else {
         !DAIF.matches_all(DAIF::I::Masked) && get_priority_mask() > 0xa0
