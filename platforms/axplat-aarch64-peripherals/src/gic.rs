@@ -289,6 +289,22 @@ pub fn irqs_enabled() -> bool {
     !DAIF.matches_all(DAIF::I::Masked)
 }
 
+#[cfg(not(feature = "pmr"))]
+#[inline]
+pub fn local_irq_save_and_disable() -> usize {
+    let flags: usize;
+    // save `DAIF` flags
+    unsafe { asm!("mrs {}, daif", out(reg) flags) };
+    disable_irqs();
+    flags
+}
+
+#[cfg(not(feature = "pmr"))]
+#[inline]
+pub fn local_irq_restore(flags: usize) {
+    unsafe { asm!("msr daif, {}", in(reg) flags) };
+}
+
 /// Allows the current CPU to respond to interrupts.
 ///
 /// In AArch64, it unmasks IRQs by setting the priority mask to 0xFF
@@ -321,31 +337,25 @@ pub fn irqs_enabled() -> bool {
     (!DAIF.matches_all(DAIF::I::Masked)) && get_priority_mask() > 0xa0
 }
 
-#[cfg(not(feature = "pmr"))]
-#[inline]
-pub fn local_irq_save() -> usize {
-    let flags: usize;
-    // save `DAIF` flags
-    unsafe { asm!("mrs {}, daif", out(reg) flags) };
-    flags
-}
-
-#[cfg(not(feature = "pmr"))]
-#[inline]
-pub fn local_irq_restore(flags: usize) {
-    unsafe { asm!("msr daif, {}", in(reg) flags) };
-}
+#[cfg(feature = "pmr")]
+const GICC_PMR: usize = 0xffff_0000_0800_0004;
 
 #[cfg(feature = "pmr")]
 #[inline]
-pub fn local_irq_save() -> usize {
-    get_priority_mask() as usize
+pub fn local_irq_save_and_disable() -> usize {
+    let pmr = unsafe {core::ptr::read_volatile((GICC_PMR) as *const u32) as u8};
+    unsafe {
+        core::ptr::write_volatile((GICC_PMR) as *mut u32, 0x80u32);
+    }
+    pmr as usize
 }
 
 #[cfg(feature = "pmr")]
 #[inline]
 pub fn local_irq_restore(flags: usize) {
-    set_priority_mask(flags as u8);
+    unsafe {
+        core::ptr::write_volatile((GICC_PMR) as *mut u32, flags as u8 as u32);
+    }
 }
 
 /// Default implementation of [`axplat::irq::IrqIf`] using the GIC.
@@ -398,8 +408,7 @@ macro_rules! irq_if_impl {
 
             /// Save irq status and disable
             fn local_irq_save_and_disable() -> usize {
-                let pm = $crate::gic::local_irq_save();
-                $crate::gic::disable_irqs();
+                $crate::gic::local_irq_save_and_disable()
                 pm
             }
 
