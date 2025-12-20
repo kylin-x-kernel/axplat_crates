@@ -135,6 +135,10 @@ pub fn handle_irq(_unused: usize) -> Option<usize> {
 
     trace!("IRQ: {ack:?}");
 
+    if irq != 23{
+        unsafe { asm!("msr daifclr, #2") };
+    }
+
     if !IRQ_HANDLER_TABLE.handle(irq) {
         debug!("Unhandled IRQ {ack:?}");
     }
