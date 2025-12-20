@@ -20,6 +20,7 @@ use lazyinit::LazyInit;
 /// The maximum number of IRQs.
 const MAX_IRQ_COUNT: usize = 1024;
 
+#[cfg(feature = "gicv2")]
 const MAX_CPUS: usize = 256;
 
 static GIC: LazyInit<SpinNoIrq<Gic>> = LazyInit::new();
@@ -28,6 +29,7 @@ static TRAP_OP: LazyInit<TrapOp> = LazyInit::new();
 
 static IRQ_HANDLER_TABLE: HandlerTable<MAX_IRQ_COUNT> = HandlerTable::new();
 
+#[cfg(feature = "gicv2")]
 static GICC_INITIALIZED: [AtomicBool; MAX_CPUS] = [
     const { AtomicBool::new(false) }; MAX_CPUS
 ];
@@ -175,6 +177,7 @@ pub fn init_gic(gicd_base: axplat::mem::VirtAddr, gicc_base: axplat::mem::VirtAd
 
     let mut gic = unsafe { Gic::new(gicd_base, gicc_base, None) };
     gic.init();
+
     GIC.init_once(SpinNoIrq::new(gic));
     let cpu = GIC.lock().cpu_interface();
     TRAP_OP.init_once(cpu.trap_operations());
@@ -199,11 +202,13 @@ pub fn init_gic(gicd_base: axplat::mem::VirtAddr, gicr_base: axplat::mem::VirtAd
 /// It must be called after [`init_gic`].
 #[cfg(feature = "gicv2")]
 pub fn init_gicc() {
+    debug!("Initialize GIC CPU Interface...");
     let mut cpu = GIC.lock().cpu_interface();
     cpu.init_current_cpu();
     cpu.set_eoi_mode_ns(false);
 }
 
+#[cfg(feature = "gicv2")]
 pub fn is_gicc_initialized(cpu_id: usize) -> bool {
     GICC_INITIALIZED
         .get(cpu_id)
@@ -211,6 +216,7 @@ pub fn is_gicc_initialized(cpu_id: usize) -> bool {
         .load(Ordering::Acquire)
 }
 
+#[cfg(feature = "gicv2")]
 pub fn set_gicc_initialized(cpu_id: usize) {
     let atomic_bool = GICC_INITIALIZED
         .get(cpu_id)
@@ -390,6 +396,8 @@ pub fn cpu_id() -> usize {
 ///
 /// After the GICC has been initialized, IRQ masking is performed via the GIC
 /// priority mask (PMR) instead.
+/// 
+/// TODO: support gicv3
 #[cfg(feature = "pmr")]
 #[inline]
 pub fn local_irq_save_and_disable() -> usize {
@@ -410,6 +418,8 @@ pub fn local_irq_save_and_disable() -> usize {
 /// If the GICC has already been initialized, the saved value is interpreted as a
 /// GIC priority mask and restored via the PMR. Otherwise, the saved DAIF value
 /// is written back directly (early boot path).
+/// 
+/// TODO: support gicv3
 #[cfg(feature = "pmr")]
 #[inline]
 pub fn local_irq_restore(flags: usize) {
