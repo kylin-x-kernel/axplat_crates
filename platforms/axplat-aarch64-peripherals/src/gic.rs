@@ -11,9 +11,8 @@
 use arm_gic_driver::v2::*;
 #[cfg(feature = "gicv3")]
 use arm_gic_driver::v3::*;
-
-use axplat::irq::{HandlerTable, IpiTarget, IrqHandler};
-use core::arch::asm;
+use axplat::{irq::{HandlerTable, IpiTarget, IrqHandler}};
+use core::{arch::asm, sync::atomic::{AtomicBool, Ordering}};
 use aarch64_cpu::registers::{DAIF, Readable};
 use kspin::SpinNoIrq;
 use lazyinit::LazyInit;
@@ -21,11 +20,17 @@ use lazyinit::LazyInit;
 /// The maximum number of IRQs.
 const MAX_IRQ_COUNT: usize = 1024;
 
+const MAX_CPUS: usize = 256;
+
 static GIC: LazyInit<SpinNoIrq<Gic>> = LazyInit::new();
 
 static TRAP_OP: LazyInit<TrapOp> = LazyInit::new();
 
 static IRQ_HANDLER_TABLE: HandlerTable<MAX_IRQ_COUNT> = HandlerTable::new();
+
+static GICC_INITIALIZED: [AtomicBool; MAX_CPUS] = [
+    const { AtomicBool::new(false) }; MAX_CPUS
+];
 
 /// set trigger type of given IRQ
 pub fn set_trigger(irq_num: usize, edge: bool) {
@@ -170,7 +175,6 @@ pub fn init_gic(gicd_base: axplat::mem::VirtAddr, gicc_base: axplat::mem::VirtAd
 
     let mut gic = unsafe { Gic::new(gicd_base, gicc_base, None) };
     gic.init();
-
     GIC.init_once(SpinNoIrq::new(gic));
     let cpu = GIC.lock().cpu_interface();
     TRAP_OP.init_once(cpu.trap_operations());
@@ -195,10 +199,28 @@ pub fn init_gic(gicd_base: axplat::mem::VirtAddr, gicr_base: axplat::mem::VirtAd
 /// It must be called after [`init_gic`].
 #[cfg(feature = "gicv2")]
 pub fn init_gicc() {
-    debug!("Initialize GIC CPU Interface...");
     let mut cpu = GIC.lock().cpu_interface();
     cpu.init_current_cpu();
     cpu.set_eoi_mode_ns(false);
+}
+
+pub fn is_gicc_initialized(cpu_id: usize) -> bool {
+    GICC_INITIALIZED
+        .get(cpu_id)
+        .unwrap_or_else(|| panic!("Invalid CPU ID: {}", cpu_id))
+        .load(Ordering::Acquire)
+}
+
+pub fn set_gicc_initialized(cpu_id: usize) {
+    let atomic_bool = GICC_INITIALIZED
+        .get(cpu_id)
+        .unwrap_or_else(|| panic!("Invalid CPU ID: {}", cpu_id));
+    
+    if atomic_bool.compare_exchange(false, true, Ordering::AcqRel, Ordering::Relaxed).is_err() {
+        panic!("GICC for CPU {} is already initialized", cpu_id);
+    }
+    
+    debug!("GIC CPU Interface initialized for CPU {}", cpu_id);
 }
 
 /// Initializes GICR (for all CPUs).
@@ -305,58 +327,60 @@ pub fn local_irq_restore(flags: usize) {
     unsafe { asm!("msr daif, {}", in(reg) flags) };
 }
 
-/// Allows the current CPU to respond to interrupts.
+/// Enables IRQ handling on the current CPU.
 ///
-/// When the GIC CPU interface is not initialized yet (early boot),
-/// fall back to DAIF-based IRQ unmasking.
-/// After GIC initialization, IRQ masking/unmasking is controlled
-/// via the GIC priority mask (PMR).
+/// This clears the IRQ mask bit in DAIF and sets the GIC priority mask
+/// to allow all interrupt priorities.
 #[cfg(feature = "pmr")]
 #[inline]
 pub fn enable_irqs() {
-    if !GIC.is_inited() {
-        // Early boot: GIC CPU interface not ready, use DAIF directly
-        unsafe { asm!("msr daifclr, #2") };
-    } else {
-        // Normal path: unmask all IRQ priorities via GIC PMR
-        set_priority_mask(0xff);
-        unsafe { asm!("msr daifclr, #2") };
-    }
+    set_priority_mask(0xff);
+    unsafe { asm!("msr daifclr, #2") };
 }
 
-/// Makes the current CPU ignore interrupts.
+/// Disables IRQ handling on the current CPU.
 ///
-/// During early boot, IRQs are masked using DAIF.
-/// Once the GIC CPU interface is initialized, IRQ masking is done
-/// via the GIC priority mask (PMR).
+/// This masks IRQs via DAIF and raises the GIC priority mask to block
+/// normal interrupts.
 #[cfg(feature = "pmr")]
 #[inline]
 pub fn disable_irqs() {
-    if !GIC.is_inited() {
-        // Early boot: mask IRQs via DAIF
-        unsafe { asm!("msr daifset, #2") };
-    } else {
-        // Normal path: raise GIC priority mask to block IRQs
-        set_priority_mask(0x80);
-        unsafe { asm!("msr daifclr, #2") };
-    }
+    set_priority_mask(0x80);
+    unsafe { asm!("msr daifclr, #2") };
 }
 
-/// Returns whether the current CPU is allowed to respond to interrupts.
+/// Returns whether IRQs are currently enabled on this CPU.
 ///
-/// In early boot, this is determined solely by the DAIF register.
-/// After GIC initialization, both DAIF and the GIC priority mask
-/// are considered.
+/// IRQs are considered enabled only if the DAIF IRQ mask is clear
+/// and the GIC priority mask allows interrupts.
 #[cfg(feature = "pmr")]
 #[inline]
 pub fn irqs_enabled() -> bool {
-    if !GIC.is_inited() {
-        !DAIF.matches_all(DAIF::I::Masked)
-    } else {
-        !DAIF.matches_all(DAIF::I::Masked) && get_priority_mask() > 0xa0
-    }
+    !DAIF.matches_all(DAIF::I::Masked) && get_priority_mask() > 0xa0
 }
 
+/// Returns a hardware-derived CPU identifier using MPIDR_EL1.
+///
+/// This function is intended for early boot or early SMP bring-up
+/// stages where higher-level helpers (e.g. `this_cpu_id()`) 
+/// are not yet available.
+///
+/// Currently, only `MPIDR_EL1.Aff0` is used as the CPU index. This
+/// assumes a single-cluster system where Aff0 uniquely identifies
+/// each CPU. On systems with multiple clusters, Aff0 alone is not
+/// guaranteed to be globally unique.
+#[inline(always)]
+pub fn cpu_id() -> usize {
+    let mpidr: usize;
+    unsafe {
+        core::arch::asm!(
+            "mrs {0}, mpidr_el1",
+            out(reg) mpidr,
+            options(nomem, nostack, preserves_flags),
+        );
+    }
+    mpidr & 0xff
+}
 
 /// Save the current interrupt state and disable IRQs.
 ///
@@ -364,12 +388,12 @@ pub fn irqs_enabled() -> bool {
 /// is initialized. In that case, it falls back to manipulating the DAIF register
 /// directly to mask IRQs.
 ///
-/// After the GIC has been initialized, IRQ masking is performed via the GIC
+/// After the GICC has been initialized, IRQ masking is performed via the GIC
 /// priority mask (PMR) instead.
 #[cfg(feature = "pmr")]
 #[inline]
 pub fn local_irq_save_and_disable() -> usize {
-    if GIC.is_inited() {
+    if is_gicc_initialized(cpu_id()) {
         let pmr = get_priority_mask() as usize;
         disable_irqs();
         pmr
@@ -383,13 +407,13 @@ pub fn local_irq_save_and_disable() -> usize {
 
 /// Restore the interrupt state saved by [`local_irq_save_and_disable`].
 ///
-/// If the GIC has already been initialized, the saved value is interpreted as a
+/// If the GICC has already been initialized, the saved value is interpreted as a
 /// GIC priority mask and restored via the PMR. Otherwise, the saved DAIF value
 /// is written back directly (early boot path).
 #[cfg(feature = "pmr")]
 #[inline]
 pub fn local_irq_restore(flags: usize) {
-    if GIC.is_inited() {
+    if is_gicc_initialized(cpu_id()) {
         set_priority_mask(flags as u8);
     } else {
         unsafe { asm!("msr daif, {}", in(reg) flags) };
