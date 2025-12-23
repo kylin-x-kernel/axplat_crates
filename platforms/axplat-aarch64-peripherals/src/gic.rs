@@ -30,16 +30,16 @@ static GICC_PMR: LazyInit<usize> = LazyInit::new();
 
 const PMR_OFFSET: usize = 0x4;
 
-static GIC_INIT: AtomicBool = AtomicBool::new(false);
+static GIC_INITIALIZED: AtomicBool = AtomicBool::new(false);
 
 #[inline]
-pub fn set_flag(val: bool) {
-    GIC_INIT.store(val, Ordering::SeqCst);
+pub fn set_gic_init_status(status: bool) {
+    GIC_INITIALIZED.store(status, Ordering::SeqCst);
 }
 
 #[inline]
-pub fn get_flag() -> bool {
-    GIC_INIT.load(Ordering::SeqCst)
+pub fn is_gic_initialized() -> bool {
+    GIC_INITIALIZED.load(Ordering::SeqCst)
 }
 
 /// set trigger type of given IRQ
@@ -141,7 +141,11 @@ pub fn handle_irq(_unused: usize, pmu_irq: usize) -> Option<usize> {
 
     trace!("IRQ: {ack:?}");
 
+    #[cfg(feature = "pmr")]
     if irq != pmu_irq{
+        // Setting priority mask to 0x80 allows higher priority interrupts to nest
+        set_priority_mask(0x80);
+        // Clear the I bit in DAIF register to enable IRQ interrupts
         unsafe { asm!("msr daifclr, #2") };
     }
 
@@ -152,6 +156,12 @@ pub fn handle_irq(_unused: usize, pmu_irq: usize) -> Option<usize> {
     TRAP_OP.eoi(ack);
     if TRAP_OP.eoi_mode_ns() {
         TRAP_OP.dir(ack);
+    }
+
+    #[cfg(feature = "pmr")]
+    // Restore the priority mask to default value 0xff after non-PMU interrupt handling
+    if irq != pmu_irq{
+        set_priority_mask(0xff);
     }
 
     Some(irq)
@@ -185,7 +195,7 @@ pub fn init_gic(gicd_base: axplat::mem::VirtAddr, gicc_base: axplat::mem::VirtAd
     let gicd_base = VirtAddr::new(gicd_base.into());
     let gicc_base = VirtAddr::new(gicc_base.into());
     GICC_PMR.init_once(usize::from(gicc_base) + PMR_OFFSET);
-    set_flag(true);
+    set_gic_init_status(true);
     let mut gic = unsafe { Gic::new(gicd_base, gicc_base, None) };
     gic.init();
 
@@ -368,7 +378,7 @@ pub fn irqs_enabled() -> bool {
 #[cfg(feature = "pmr")]
 #[inline]
 pub fn local_irq_save_and_disable() -> usize {
-    if get_flag(){
+    if is_gic_initialized(){
         let pmr = get_priority_mask();
         set_priority_mask(0x80);
         pmr as usize
@@ -391,7 +401,7 @@ pub fn local_irq_save_and_disable() -> usize {
 #[cfg(feature = "pmr")]
 #[inline]
 pub fn local_irq_restore(flags: usize) {
-    if get_flag(){
+    if is_gic_initialized(){
         set_priority_mask(flags as u8);
     }
     else{
