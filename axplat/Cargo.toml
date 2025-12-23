@@ -5,6 +5,7 @@ description = "This crate provides a unified abstraction layer for diverse hardw
 documentation = "https://docs.rs/axplat"
 keywords = ["arceos", "os", "hal", "embedded"]
 categories = ["embedded", "no-std", "hardware-support", "os"]
+workspace = ".."
 edition.workspace = true
 authors.workspace = true
 license.workspace = true

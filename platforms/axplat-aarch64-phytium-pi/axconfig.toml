@@ -87,6 +87,8 @@ uart-irq = 0x74                 # uint
 timer-irq = 0x1e                # uint
 # IPI interrupt num
 ipi-irq = 1                     # uint
+# PMU interrupt num
+pmu-irq = 23                     # uint
 
 # GIC CPU Interface base address
 gicc-paddr = 0x3080_0000        # uint

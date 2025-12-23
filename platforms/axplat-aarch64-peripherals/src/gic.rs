@@ -126,7 +126,7 @@ pub fn get_priority_mask() -> u8 {
 /// IRQ handler table and calls the corresponding handler. If necessary, it
 /// also acknowledges the interrupt controller after handling.
 #[cfg(feature = "gicv2")]
-pub fn handle_irq(_unused: usize) -> Option<usize> {
+pub fn handle_irq(_unused: usize, pmu_irq: usize) -> Option<usize> {
     let ack = TRAP_OP.ack();
 
     if ack.is_special() {
@@ -141,7 +141,7 @@ pub fn handle_irq(_unused: usize) -> Option<usize> {
 
     trace!("IRQ: {ack:?}");
 
-    if irq != 23{
+    if irq != pmu_irq{
         unsafe { asm!("msr daifclr, #2") };
     }
 
@@ -434,7 +434,8 @@ macro_rules! irq_if_impl {
             /// IRQ handler table and calls the corresponding handler. If necessary, it
             /// also acknowledges the interrupt controller after handling.
             fn handle(irq: usize) -> Option<usize> {
-                $crate::gic::handle_irq(irq)
+                let pmu_irq = crate::config::devices::PMU_IRQ;
+                $crate::gic::handle_irq(irq, pmu_irq)
             }
 
             /// Sends an inter-processor interrupt (IPI) to the specified target CPU or all CPUs.
