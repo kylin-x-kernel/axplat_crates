@@ -16,7 +16,7 @@ fp-simd = ["axcpu/fp-simd"]
 irq = ["axplat/irq", "axplat-aarch64-peripherals/irq"]
 rtc = []
 smp = ["axplat/smp"]
-pmr = ["axplat-aarch64-peripherals/pmr"]
+pmu = ["axplat-aarch64-peripherals/pmu", "irq", "axplat/nmi"]
 
 [dependencies]
 log = "0.4"
