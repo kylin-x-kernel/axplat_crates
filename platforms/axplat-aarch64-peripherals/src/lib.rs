@@ -11,5 +11,7 @@ pub mod pl011;
 pub mod ns16550a;
 pub mod pl031;
 pub mod psci;
-#[cfg(any(feature = "pmu", feature = "sdei"))]
+#[cfg(any(feature = "nmi-pmu", feature = "nmi-sdei"))]
 pub mod nmi;
+#[cfg(feature = "pmu")]
+pub mod pmu;

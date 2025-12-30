@@ -1,5 +1,5 @@
-#[cfg(feature = "pmu")]
-pub mod pmu;
+#[cfg(feature = "nmi-pmu")]
+pub mod nmi_pmu;
 
-#[cfg(feature = "sdei")]
-pub mod sdei;
+#[cfg(feature = "nmi-sdei")]
+pub mod nmi_sdei;

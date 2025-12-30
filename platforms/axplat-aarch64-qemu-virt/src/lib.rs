@@ -29,5 +29,5 @@ axplat_aarch64_peripherals::time_if_impl!(TimeIfImpl);
 #[cfg(feature = "irq")]
 axplat_aarch64_peripherals::irq_if_impl!(IrqIfImpl);
 
-#[cfg(feature = "pmu")]
+#[cfg(feature = "nmi")]
 axplat_aarch64_peripherals::nmi_if_impl!(NmiIfImpl);
