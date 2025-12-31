@@ -3,7 +3,7 @@
 /// PMU counter overflow callback.
 ///
 /// Called in interrupt context.
-pub type OverflowHandler = fn(index: u32);
+pub type OverflowHandler = fn();
 
 #[def_plat_interface]
 pub trait PmuIf{

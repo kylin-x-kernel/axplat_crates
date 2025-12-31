@@ -8,7 +8,7 @@ macro_rules! nmi_if_impl {
     ($name:ident) => {
         struct $name;
 
-        use axplat::nmi::NmiType;
+        use axplat::nmi::{NmiType, NmiHandler};
 
         const CYCLE_COUNTER_INDEX: u32 = 31;
 
@@ -38,6 +38,10 @@ macro_rules! nmi_if_impl {
 
             fn nmi_type() -> NmiType {
                 NmiType::PseudoNmi
+            }
+
+            fn register_nmi_handler(handler:NmiHandler) -> bool{
+                $crate::pmu::register_overflow_handler(CYCLE_COUNTER_INDEX, handler)
             }
         }
     };

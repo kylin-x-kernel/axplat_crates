@@ -10,6 +10,7 @@ pub enum NmiType {
     None,
 }
 
+pub type NmiHandler = fn();
 
 /// Trait for NMI sources.
 ///
@@ -38,4 +39,7 @@ pub trait NmiIf{
 
     /// Get the name of this NMI source (for debugging).
     fn name() -> &'static str;
+
+    /// Nmi handle func
+    fn register_nmi_handler(handler:NmiHandler) -> bool;
 }

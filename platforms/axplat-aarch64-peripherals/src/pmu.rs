@@ -193,7 +193,7 @@ pub fn handle_overflows() -> bool {
                 handled_any = true;
 
                 if let Some(h) = handler {
-                    h(idx as u32);
+                    h();
                 }
             }
         }
