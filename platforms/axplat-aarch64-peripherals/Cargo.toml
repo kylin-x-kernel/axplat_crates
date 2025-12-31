@@ -17,7 +17,7 @@ default = ["gicv2"]
 gicv2 = ["irq"]
 gicv3 = ["irq"]
 pmr = []
-pmu = ["dep:aarch64-pmuv3", "irq"]
+pmu = ["dep:aarch64-pmuv3", "irq", "axplat/pmu"]
 nmi-pmu = ["pmr", "pmu", "axplat/nmi"]
 nmi-sdei = []
 

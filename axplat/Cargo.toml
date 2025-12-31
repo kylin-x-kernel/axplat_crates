@@ -15,6 +15,7 @@ repository.workspace = true
 smp = ["kspin/smp"]
 irq = ["dep:handler_table"]
 nmi = ["irq"]
+pmu = ["irq"]
 
 [dependencies]
 memory_addr = "0.4"

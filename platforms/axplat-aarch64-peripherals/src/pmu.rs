@@ -1,5 +1,6 @@
 use aarch64_pmuv3::pmuv3::{PmuCounter, PmuEvent};
 use lazyinit::LazyInit;
+use axplat::pmu::OverflowHandler;
 
 const MAX_PMU_COUNTERS: usize = 32;
 
@@ -9,6 +10,7 @@ const MAX_PMU_COUNTERS: usize = 32;
 /// Each slot may or may not be initialized, hence the use of `Option`.
 pub struct PmuManager {
     counters: [Option<PmuCounter>; MAX_PMU_COUNTERS],
+    overflow_handlers: [Option<OverflowHandler>; MAX_PMU_COUNTERS],
 }
 
 /// Per-CPU lazy-initialized PMU manager.
@@ -26,8 +28,33 @@ unsafe fn ensure_pmu_inited() -> &'static mut PmuManager {
     let pmu = unsafe { PMU.current_ref_mut_raw() };
     pmu.call_once(|| PmuManager {
         counters: [const { None }; MAX_PMU_COUNTERS],
+        overflow_handlers: [const { None }; MAX_PMU_COUNTERS],
     });
     pmu
+}
+
+/// Register an overflow handler for a PMU counter.
+///
+/// The handler will be invoked in interrupt context when the
+/// corresponding counter overflows.
+pub fn register_overflow_handler(index: u32, handler: OverflowHandler) -> bool {
+    let idx = index as usize;
+
+    if idx >= MAX_PMU_COUNTERS {
+        return false;
+    }
+
+    unsafe {
+        let pmu = PMU.current_ref_mut_raw();
+
+        // Counter must be initialized first.
+        if pmu.counters[idx].is_none() {
+            return false;
+        }
+
+        pmu.overflow_handlers[idx] = Some(handler);
+        true
+    }
 }
 
 /// Initialize the cycle counter.
@@ -142,17 +169,36 @@ pub fn is_enabled(index: u32) -> bool {
     }
 }
 
-/// Handle a PMU counter overflow.
+/// Handle PMU counter overflows.
 ///
-/// Returns `true` if an initialized counter handled the overflow
-/// successfully, otherwise returns `false`.
-pub fn handle_overflow(index: u32) -> bool {
+/// This function scans all initialized counters and handles
+/// every pending overflow. It must be called from the PMU IRQ
+/// handler.
+///
+/// Returns `true` if at least one counter overflow was handled.
+pub fn handle_overflows() -> bool {
     unsafe {
-        let mut handled = false;
-        with_counter_mut(index, |c| {
-            handled = c.handle_overflow().is_ok();
-        });
-        handled
+        let pmu = PMU.current_ref_mut_raw();
+        let mut handled_any = false;
+
+        for idx in 0..MAX_PMU_COUNTERS {
+            // Copy the handler first (no borrow conflict)
+            let handler = pmu.overflow_handlers[idx];
+
+            let Some(counter) = pmu.counters[idx].as_mut() else {
+                continue;
+            };
+
+            if counter.handle_overflow().is_ok() {
+                handled_any = true;
+
+                if let Some(h) = handler {
+                    h(idx as u32);
+                }
+            }
+        }
+
+        handled_any
     }
 }
 
@@ -164,4 +210,27 @@ pub fn set_threshold(index: u32, threshold: u64) {
     unsafe {
         with_counter_mut(index, |c| c.set_threshold(threshold));
     }
+}
+
+/// Default implementation of [`axplat::pmu::PmuIf`]
+#[macro_export]
+macro_rules! pmu_if_impl {
+    ($name:ident) => {
+        struct $name;
+
+        use axplat::pmu::OverflowHandler;
+
+        #[impl_plat_interface]
+        impl axplat::pmu::PmuIf for $name {
+            /// Pmu interrupt handle func
+            fn handle_overflows() -> bool{
+                $crate::pmu::handle_overflows()
+            }
+
+            /// Register an overflow handler for a PMU counter.
+            fn register_overflow_handler(index: u32, handler: OverflowHandler) -> bool{
+                $crate::pmu::register_overflow_handler(index, handler)
+            }
+        }
+    };
 }

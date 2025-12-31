@@ -15,6 +15,8 @@ macro_rules! nmi_if_impl {
         #[impl_plat_interface]
         impl axplat::nmi::NmiIf for $name {
             fn init(threshold: u64) -> bool {
+                // Register interrupt handler on primary core only
+                $crate::gic::set_priority(crate::config::devices::PMU_IRQ, 0);
                 $crate::pmu::init_cycle_counter(threshold)
             }
 
@@ -28,10 +30,6 @@ macro_rules! nmi_if_impl {
 
             fn is_enabled() -> bool {
                 $crate::pmu::is_enabled(CYCLE_COUNTER_INDEX)
-            }
-
-            fn handle() -> bool {
-                $crate::pmu::handle_overflow(CYCLE_COUNTER_INDEX)
             }
 
             fn name() -> &'static str {

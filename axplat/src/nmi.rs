@@ -38,7 +38,4 @@ pub trait NmiIf{
 
     /// Get the name of this NMI source (for debugging).
     fn name() -> &'static str;
-
-    /// NMI handle func
-    fn handle() -> bool;
 }
