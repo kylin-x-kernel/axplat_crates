@@ -159,7 +159,7 @@ fn open_high_priority_irq_mode(){
 /// It is intended to restore a CPU-masked baseline after temporarily
 /// delegating IRQ control to PMR.
 #[cfg(feature = "pmr")]
-fn restore_irq_cpu_masking(){
+fn close_irq_and_restore_masking(){
     unsafe { asm!("msr daifset, #2") };
     set_priority_mask(0xff);
 }
@@ -186,7 +186,7 @@ pub fn handle_irq(_unused: usize, pmu_irq: usize) -> Option<usize> {
 
     trace!("IRQ: {ack:?}");
 
-    #[cfg(feature = "pmr")]
+    #[cfg(feature = "nmi-pmu")]
     if irq != pmu_irq{
         open_high_priority_irq_mode();
     }
@@ -200,9 +200,9 @@ pub fn handle_irq(_unused: usize, pmu_irq: usize) -> Option<usize> {
         TRAP_OP.dir(ack);
     }
 
-    #[cfg(feature = "pmr")]
+    #[cfg(feature = "nmi-pmu")]
     if irq != pmu_irq{
-        restore_irq_cpu_masking();
+        close_irq_and_restore_masking();
     }
 
     Some(irq)
