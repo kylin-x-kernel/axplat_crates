@@ -100,7 +100,7 @@ impl TimeIf for TimeIfImpl {
 
     /// Returns the timer frequency in Hz.
     fn timer_frequency() -> u64 {
-        crate::config::devices::TIMER_FREQUENCY
+        crate::config::devices::TIMER_FREQUENCY as u64
     }
     
     /// Returns the IRQ number for the timer interrupt.
