@@ -110,6 +110,11 @@ impl TimeIf for TimeIfImpl {
         nanos / *NANOS_PER_TICK
     }
 
+    /// Returns the timer frequency in Hz.
+    fn timer_frequency() -> u64 {
+        crate::config::devices::TIMER_FREQUENCY
+    }
+
     /// Returns the IRQ number for the timer interrupt.
     #[cfg(feature = "irq")]
     fn irq_num() -> usize {

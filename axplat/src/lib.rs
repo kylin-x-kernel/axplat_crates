@@ -10,7 +10,11 @@ pub mod init;
 #[cfg(feature = "irq")]
 pub mod irq;
 pub mod mem;
+#[cfg(feature = "nmi")]
+pub mod nmi;
 pub mod percpu;
+#[cfg(feature = "pmu")]
+pub mod pmu;
 pub mod power;
 pub mod time;
 pub mod psci;

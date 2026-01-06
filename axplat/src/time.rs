@@ -28,6 +28,9 @@ pub trait TimeIf {
     /// Converts hardware ticks to nanoseconds.
     fn ticks_to_nanos(ticks: u64) -> u64;
 
+    /// Returns the timer frequency in Hz.
+    fn timer_frequency() -> u64;
+
     /// Converts nanoseconds to hardware ticks.
     fn nanos_to_ticks(nanos: u64) -> u64;
 

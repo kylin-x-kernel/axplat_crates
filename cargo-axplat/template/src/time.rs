@@ -25,6 +25,10 @@ impl TimeIf for TimeIfImpl {
         todo!()
     }
 
+    fn timer_frequency() -> u64 {
+        todo!()
+    }
+
     /// Returns the IRQ number for the timer interrupt.
     #[cfg(feature = "irq")]
     fn irq_num() -> usize {

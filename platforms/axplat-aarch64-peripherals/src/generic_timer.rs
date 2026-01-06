@@ -40,6 +40,12 @@ pub fn set_oneshot_timer(deadline_ns: u64) {
     }
 }
 
+/// Returns the timer frequency in Hz.  
+#[inline]
+pub fn timer_frequency() -> u64 {
+    CNTFRQ_EL0.get()
+}
+
 /// Early stage initialization: stores the timer frequency.
 pub fn init_early() {
     let freq = CNTFRQ_EL0.get();
@@ -90,6 +96,10 @@ macro_rules! time_if_impl {
             /// clock start).
             fn epochoffset_nanos() -> u64 {
                 $crate::pl031::epochoffset_nanos()
+            }
+
+            fn timer_frequency() -> u64 {
+                $crate::generic_timer::timer_frequency()
             }
 
             /// Returns the IRQ number for the timer interrupt.
