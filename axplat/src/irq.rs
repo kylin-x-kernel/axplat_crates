@@ -54,7 +54,7 @@ pub trait IrqIf {
     /// the input `irq` number, for example on AArch64 the input `irq` is
     /// ignored and the real IRQ number is obtained from the GIC. Returns
     /// `None` if the IRQ is spurious.
-    fn handle(irq: usize) -> Option<usize>;
+    fn handle(irq: usize, tf: &TrapFrame) -> Option<usize>;
 
     /// Sends an inter-processor interrupt (IPI) to the specified target CPU or all CPUs.
     fn send_ipi(irq_num: usize, target: IpiTarget);

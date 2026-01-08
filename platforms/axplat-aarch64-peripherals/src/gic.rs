@@ -171,7 +171,7 @@ fn close_irq_and_restore_masking(){
 /// also acknowledges the interrupt controller after handling.
 #[cfg(feature = "gicv2")]
 #[allow(unused_variables)]
-pub fn handle_irq(_unused: usize, pmu_irq: usize) -> Option<usize> {
+pub fn handle_irq(_unused: usize, tf: &TrapFrame, pmu_irq: usize) -> Option<usize> {
     let ack = TRAP_OP.ack();
 
     if ack.is_special() {
@@ -191,7 +191,7 @@ pub fn handle_irq(_unused: usize, pmu_irq: usize) -> Option<usize> {
         open_high_priority_irq_mode();
     }
 
-    if !IRQ_HANDLER_TABLE.handle(irq) {
+    if !IRQ_HANDLER_TABLE.handle(irq, tf) {
         debug!("Unhandled IRQ {ack:?}");
     }
 
@@ -486,9 +486,9 @@ macro_rules! irq_if_impl {
             /// It is called by the common interrupt handler. It should look up in the
             /// IRQ handler table and calls the corresponding handler. If necessary, it
             /// also acknowledges the interrupt controller after handling.
-            fn handle(irq: usize) -> Option<usize> {
+            fn handle(irq: usize, tf: &TrapFrame) -> Option<usize> {
                 let pmu_irq = crate::config::devices::PMU_IRQ;
-                $crate::gic::handle_irq(irq, pmu_irq)
+                $crate::gic::handle_irq(irq, tf: &TrapFrame, pmu_irq)
             }
 
             /// Sends an inter-processor interrupt (IPI) to the specified target CPU or all CPUs.
