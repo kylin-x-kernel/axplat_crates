@@ -16,7 +16,7 @@ use core::arch::asm;
 use aarch64_cpu::registers::{DAIF, Readable};
 use kspin::SpinNoIrq;
 use lazyinit::LazyInit;
-
+use axcpu::TrapFrame;
 #[cfg(feature = "pmr")]
 use core::sync::atomic::{AtomicBool, Ordering};
 

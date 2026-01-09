@@ -1,7 +1,7 @@
 //! Interrupt request (IRQ) handling.
 
 pub use handler_table::HandlerTable;
-
+use axcpu::TrapFrame;
 /// The type if an IRQ handler.
 pub type IrqHandler = handler_table::Handler;
 
