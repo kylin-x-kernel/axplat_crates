@@ -9,8 +9,8 @@ pub enum NmiType {
     /// Not supported
     None,
 }
-
-pub type NmiHandler = fn();
+use axcpu::TrapFrame;
+pub type NmiHandler = fn(&TrapFrame);
 
 /// Trait for NMI sources.
 ///

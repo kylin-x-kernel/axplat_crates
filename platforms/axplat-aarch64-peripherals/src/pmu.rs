@@ -176,7 +176,7 @@ pub fn is_enabled(index: u32) -> bool {
 /// handler.
 ///
 /// Returns `true` if at least one counter overflow was handled.
-pub fn handle_overflows() -> bool {
+pub fn handle_overflows(tf: &TrapFrame) -> bool {
     unsafe {
         let pmu = PMU.current_ref_mut_raw();
         let mut handled_any = false;
@@ -193,7 +193,7 @@ pub fn handle_overflows() -> bool {
                 handled_any = true;
 
                 if let Some(h) = handler {
-                    h();
+                    h(tf);
                 }
             }
         }
