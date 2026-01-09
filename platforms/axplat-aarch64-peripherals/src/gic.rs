@@ -190,13 +190,13 @@ pub fn handle_irq(_unused: usize, tf: &TrapFrame, pmu_irq: usize) -> Option<usiz
     if irq == pmu_irq{
         error!("{}",axbacktrace::backtrace::capture_trap(tf.x[29], tf.x[30], tf.x[30]));
     }
-    
+
     #[cfg(feature = "nmi-pmu")]
     if irq != pmu_irq{
         open_high_priority_irq_mode();
     }
 
-    if !IRQ_HANDLER_TABLE.handle(irq, tf) {
+    if !IRQ_HANDLER_TABLE.handle(irq) {
         debug!("Unhandled IRQ {ack:?}");
     }
 

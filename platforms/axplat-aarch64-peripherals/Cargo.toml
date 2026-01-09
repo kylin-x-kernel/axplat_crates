@@ -37,6 +37,7 @@ axcpu = { workspace = true }
 axplat = { workspace = true }
 aarch64-pmuv3 = { git = "https://github.com/kylin-x-kernel/aarch64-pmuv3.git", branch = "lzx/dev", optional = true }
 percpu = "0.2.0"
+axbacktrace = "0.1"
 
 [package.metadata.docs.rs]
 targets = ["aarch64-unknown-none"]
