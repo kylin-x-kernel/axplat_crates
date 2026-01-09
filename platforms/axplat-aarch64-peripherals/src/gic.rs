@@ -463,6 +463,8 @@ macro_rules! irq_if_impl {
     ($name:ident) => {
         struct $name;
 
+        use axcpu::TrapFrame;
+        
         #[impl_plat_interface]
         impl axplat::irq::IrqIf for $name {
             /// Enables or disables the given IRQ.
