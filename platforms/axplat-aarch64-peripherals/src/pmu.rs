@@ -1,6 +1,7 @@
 use aarch64_pmuv3::pmuv3::{PmuCounter, PmuEvent};
 use lazyinit::LazyInit;
 use axplat::pmu::OverflowHandler;
+use axcpu::TrapFrame;
 
 const MAX_PMU_COUNTERS: usize = 32;
 
