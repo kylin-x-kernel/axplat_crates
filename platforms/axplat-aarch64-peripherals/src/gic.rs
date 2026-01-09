@@ -493,7 +493,7 @@ macro_rules! irq_if_impl {
             /// also acknowledges the interrupt controller after handling.
             fn handle(irq: usize, tf: &TrapFrame) -> Option<usize> {
                 let pmu_irq = crate::config::devices::PMU_IRQ;
-                $crate::gic::handle_irq(irq, tf: &TrapFrame, pmu_irq)
+                $crate::gic::handle_irq(irq, tf, pmu_irq)
             }
 
             /// Sends an inter-processor interrupt (IPI) to the specified target CPU or all CPUs.
