@@ -186,17 +186,12 @@ pub fn handle_irq(_unused: usize, tf: &TrapFrame, pmu_irq: usize) -> Option<usiz
 
     trace!("IRQ: {ack:?}");
 
-    /// 暂时每次PMU IRQ 都打印回溯信息，用于调试
-    if irq == pmu_irq{
-        error!("{}",axbacktrace::Backtrace::capture_trap(tf.x[29] as usize, tf.x[30] as usize, tf.x[30] as usize));
-    }
-
     #[cfg(feature = "nmi-pmu")]
     if irq != pmu_irq{
         open_high_priority_irq_mode();
     }
 
-    if !IRQ_HANDLER_TABLE.handle(irq) {
+    if !IRQ_HANDLER_TABLE.handle(irq, tf) {
         debug!("Unhandled IRQ {ack:?}");
     }
 
