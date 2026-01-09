@@ -188,7 +188,7 @@ pub fn handle_irq(_unused: usize, tf: &TrapFrame, pmu_irq: usize) -> Option<usiz
 
     /// 暂时每次PMU IRQ 都打印回溯信息，用于调试
     if irq == pmu_irq{
-        error!("{}",axbacktrace::Backtrace::capture_trap(tf.x[29], tf.x[30], tf.x[30]));
+        error!("{}",axbacktrace::Backtrace::capture_trap(tf.x[29] as usize, tf.x[30] as usize, tf.x[30] as usize));
     }
 
     #[cfg(feature = "nmi-pmu")]
