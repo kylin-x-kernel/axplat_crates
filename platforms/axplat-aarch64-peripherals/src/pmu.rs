@@ -219,12 +219,12 @@ macro_rules! pmu_if_impl {
         struct $name;
 
         use axplat::pmu::OverflowHandler;
-
+        use axcpu::TrapFrame;
         #[impl_plat_interface]
         impl axplat::pmu::PmuIf for $name {
             /// Pmu interrupt handle func
-            fn handle_overflows() -> bool{
-                $crate::pmu::handle_overflows()
+            fn handle_overflows(tf: &TrapFrame) -> bool{
+                $crate::pmu::handle_overflows(tf)
             }
 
             /// Register an overflow handler for a PMU counter.
