@@ -220,7 +220,6 @@ macro_rules! pmu_if_impl {
         struct $name;
 
         use axplat::pmu::OverflowHandler;
-        use axcpu::TrapFrame;
         #[impl_plat_interface]
         impl axplat::pmu::PmuIf for $name {
             /// Pmu interrupt handle func
