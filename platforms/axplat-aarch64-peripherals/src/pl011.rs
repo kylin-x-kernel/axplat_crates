@@ -7,28 +7,6 @@ use lazyinit::LazyInit;
 
 static UART: LazyInit<SpinNoIrq<Pl011Uart>> = LazyInit::new();
 
-#[inline]
-fn force_write_bytes(bytes: &[u8]) {
-    // Safety: direct MMIO access to UART without taking the `UART` lock.
-    // This is best-effort and intended for emergency printing.
-    unsafe {
-        let uart_ptr = UART.current_ref_raw() as *const SpinNoIrq<Pl011Uart>;
-        if uart_ptr.is_null() {
-            return;
-        }
-        // Peek base address from the initialized UART.
-        // We can't take the lock here, so we reconstruct a temporary uart
-        // instance from its base pointer.
-        // NOTE: arm_pl011::Pl011Uart stores the base pointer internally.
-        let uart = &*(uart_ptr as *const SpinNoIrq<Pl011Uart>);
-        let base = (*uart).data_ptr();
-        let mut tmp = Pl011Uart::new(base);
-        for &c in bytes {
-            do_putchar(&mut tmp, c);
-        }
-    }
-}
-
 fn do_putchar(uart: &mut Pl011Uart, c: u8) {
     match c {
         b'\n' => {
@@ -97,7 +75,11 @@ macro_rules! console_if_impl {
             }
 
             fn write_bytes_force(bytes: &[u8]) {
-                $crate::pl011::force_write_bytes(bytes);
+                let mut uart = Pl011Uart::new(axplat::mem::phys_to_virt(axplat::mem::pa!(crate::config::devices::UART_PADDR)).as_mut_ptr());
+                uart.init();
+                for &c in bytes {
+                    $crate::pl011::do_putchar(&mut uart, c);
+                }
             }
 
             /// Reads bytes from the console into the given mutable slice.

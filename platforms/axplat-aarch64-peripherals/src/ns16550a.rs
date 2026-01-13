@@ -6,23 +6,6 @@ use lazyinit::LazyInit;
 
 static UART: LazyInit<SpinNoIrq<MmioSerialPort>> = LazyInit::new();
 
-#[inline]
-fn force_write_bytes(bytes: &[u8]) {
-    // Safety: direct MMIO access without taking the `UART` lock.
-    unsafe {
-        let uart_ptr = UART.current_ref_raw() as *const SpinNoIrq<MmioSerialPort>;
-        if uart_ptr.is_null() {
-            return;
-        }
-        // Reconstruct from the base address. MmioSerialPort only needs the base.
-        let base = (*uart_ptr).get_unchecked_mut().base_addr();
-        let mut tmp = MmioSerialPort::new(base);
-        for &c in bytes {
-            do_putchar(&mut tmp, c);
-        }
-    }
-}
-
 fn do_putchar(uart: &mut MmioSerialPort, c: u8) {
     match c {
         b'\n' => {
@@ -91,7 +74,11 @@ macro_rules! ns16550_console_if_impl {
             }
 
             fn write_bytes_force(bytes: &[u8]) {
-                $crate::ns16550a::force_write_bytes(bytes);
+                let mut uart = unsafe { MmioSerialPort::new(axplat::mem::phys_to_virt(axplat::mem::pa!(crate::config::devices::UART_PADDR)).as_usize) };
+                uart.init();
+                for &c in bytes {
+                    $crate::ns16550a::do_putchar(&mut uart, c);
+                }
             }
 
             /// Reads bytes from the console into the given mutable slice.
