@@ -10,6 +10,23 @@ const UART_BASE: PhysAddr = pa!(crate::config::devices::UART_PADDR);
 
 static UART: SpinNoIrq<DW8250> = SpinNoIrq::new(DW8250::new(phys_to_virt(UART_BASE).as_usize()));
 
+#[inline]
+fn force_putchar(c: u8) {
+    // Safety: direct MMIO access without taking the `UART` spinlock.
+    // Best-effort for emergency printing only.
+    unsafe {
+        let base = phys_to_virt(UART_BASE).as_usize();
+        let mut uart = DW8250::new(base);
+        match c {
+            b'\r' | b'\n' => {
+                uart.putchar(b'\r');
+                uart.putchar(b'\n');
+            }
+            c => uart.putchar(c),
+        }
+    }
+}
+
 /// Writes a byte to the console.
 #[allow(dead_code)]
 pub fn putchar(c: u8) {
@@ -47,6 +64,12 @@ impl ConsoleIf for ConsoleIfImpl {
     fn write_bytes(bytes: &[u8]) {
         for c in bytes {
             putchar(*c);
+        }
+    }
+
+    fn write_bytes_force(bytes: &[u8]) {
+        for &c in bytes {
+            force_putchar(c);
         }
     }
 
