@@ -17,6 +17,13 @@ fn do_putchar(uart: &mut Pl011Uart, c: u8) {
     }
 }
 
+pub fn write_bytes_force(uart_base: VirtAddr, bytes: &[u8]){
+    let mut uart = Pl011Uart::new(uart_base.as_mut_ptr());
+    uart.init();
+    for c in bytes {
+        do_putchar(&mut uart, *c);
+    }
+}
 /// Writes a byte to the console.
 pub fn putchar(c: u8) {
     do_putchar(&mut UART.lock(), c);
@@ -72,6 +79,11 @@ macro_rules! console_if_impl {
             /// Writes given bytes to the console.
             fn write_bytes(bytes: &[u8]) {
                 $crate::pl011::write_bytes(bytes);
+            }
+
+            fn write_bytes_force(bytes: &[u8]) {
+                let uart_base = axplat::mem::phys_to_virt(axplat::mem::pa!(crate::config::devices::UART_PADDR));
+                $crate::pl011::write_bytes_force(uart_base, bytes);
             }
 
             /// Reads bytes from the console into the given mutable slice.

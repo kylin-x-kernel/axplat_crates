@@ -16,6 +16,15 @@ fn do_putchar(uart: &mut MmioSerialPort, c: u8) {
     }
 }
 
+pub fn write_bytes_force(uart_base: VirtAddr, bytes: &[u8]){
+    let base_addr = uart_base.as_usize();
+    let mut uart = unsafe { MmioSerialPort::new(base_addr) };
+    uart.init();
+    for c in bytes {
+        do_putchar(&mut uart, *c);
+    }
+}
+
 /// Writes a byte to the console.
 pub fn putchar(c: u8) {
     do_putchar(&mut UART.lock(), c);
@@ -71,6 +80,11 @@ macro_rules! ns16550_console_if_impl {
             /// Writes given bytes to the console.
             fn write_bytes(bytes: &[u8]) {
                 $crate::ns16550a::write_bytes(bytes);
+            }
+
+            fn write_bytes_force(bytes: &[u8]) {
+                let mut uart_base = axplat::mem::phys_to_virt(axplat::mem::pa!(crate::config::devices::UART_PADDR));
+                $crate::ns16550a::write_bytes_force(uart_16550, bytes);
             }
 
             /// Reads bytes from the console into the given mutable slice.
