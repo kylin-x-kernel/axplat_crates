@@ -1,13 +1,31 @@
-//! AArch64 boot entry point
+//! AArch64 boot entry point - Position-independent code
 
 use core::arch::asm;
 use crate::{BootInfo, boot_info::BootProtocol};
 use crate::protocol::detect_boot_protocol;
 
+// Import linker script symbols (compatible with StarryOS)
+unsafe extern "C" {
+    static _bootloader_start: u8;
+    static _bootloader_end: u8;
+    static _skernel: u8;
+    static _ekernel: u8;
+    static boot_stack: u8;
+    static boot_stack_top: u8;
+    static _stext: u8;
+    static _etext: u8;
+    static _srodata: u8;
+    static _erodata: u8;
+    static _sdata: u8;
+    static _edata: u8;
+    static _sbss: u8;
+    static _ebss: u8;
+}
+
 /// Boot stack size
 const BOOT_STACK_SIZE: usize = 64 * 1024;
 
-/// Boot stack
+/// Boot stack (allocated in .bss.stack section)
 #[unsafe(link_section = ".bss.stack")]
 static mut BOOT_STACK: [u8; BOOT_STACK_SIZE] = [0; BOOT_STACK_SIZE];
 
@@ -17,69 +35,80 @@ static mut SAVED_X0: usize = 0;
 /// Saved X1 register value
 static mut SAVED_X1: usize = 0;
 
-/// AArch64 boot entry point
-///
-/// Register convention:
-/// - X0 = DTB address OR UEFI ImageHandle
-/// - X1 = 0 OR UEFI SystemTable
+/// Discovered physical load address
+static mut PHYS_LOAD_ADDR: usize = 0;
+
+/// AArch64 boot entry point (Position-independent)
 #[unsafe(naked)]
 #[unsafe(no_mangle)]
 #[unsafe(link_section = ".text.boot")]
 pub unsafe extern "C" fn _start() -> ! {
-    asm!(
-        // Save X0 and X1
-        "adrp    x2, {saved_x0}",
-        "str     x0, [x2, :lo12:{saved_x0}]",
-        "adrp    x2, {saved_x1}",
-        "str     x1, [x2, :lo12:{saved_x1}]",
+    core::arch::naked_asm!(
+        // Save boot parameters
+        "mov x19, x0",
+        "mov x20, x1",
 
-        // Set up boot stack
-        "adrp    x2, {boot_stack}",
-        "add     x2, x2, :lo12:{boot_stack}",
-        "mov     x3, {boot_stack_size}",
-        "add     sp, x2, x3",
+        // Discover physical load address using PC-relative addressing
+        "adr x21, _start",
 
-        // Jump to Rust code
-        "b       {rust_main}",
+        // Store physical load address
+        "adrp x25, {phys_load_addr}",
+        "str x21, [x25, :lo12:{phys_load_addr}]",
 
-        saved_x0 = sym SAVED_X0,
-        saved_x1 = sym SAVED_X1,
+        // Set up boot stack (physical address)
+        "adrp x26, {boot_stack}",
+        "add x26, x26, :lo12:{boot_stack}",
+        "mov x27, {boot_stack_size}",
+        "add sp, x26, x27",
+
+        // Save boot parameters to static variables
+        "adrp x28, {saved_x0}",
+        "str x19, [x28, :lo12:{saved_x0}]",
+        "adrp x28, {saved_x1}",
+        "str x20, [x28, :lo12:{saved_x1}]",
+
+        // Jump to Rust initialization
+        "b {rust_init}",
+
+        phys_load_addr = sym PHYS_LOAD_ADDR,
         boot_stack = sym BOOT_STACK,
         boot_stack_size = const BOOT_STACK_SIZE,
-        rust_main = sym rust_main,
-        options(noreturn)
+        saved_x0 = sym SAVED_X0,
+        saved_x1 = sym SAVED_X1,
+        rust_init = sym rust_init,
     )
 }
 
-/// Rust main entry point
+/// Rust initialization code
 #[unsafe(no_mangle)]
-unsafe extern "C" fn rust_main() -> ! {
-    // Get saved register values
+extern "C" fn rust_init() -> ! {
+    let phys_load = unsafe { PHYS_LOAD_ADDR };
     let x0 = unsafe { SAVED_X0 };
     let x1 = unsafe { SAVED_X1 };
 
-    // Detect boot protocol
-    let protocol = unsafe { detect_boot_protocol(x0, x1) };
+    info!("axplat_bootloader starting.. .");
+    info!("Physical load address: {:#x}", phys_load);
+    info!("Boot registers: X0={:#x}, X1={:#x}", x0, x1);
 
-    // Initialize BootInfo
-    let mut boot_info = BootInfo::new(protocol);
+    let protocol = unsafe { detect_boot_protocol(x0, x1) };
+    info!("Detected boot protocol: {:?}", protocol);
+
+    let mut boot_info = BootInfo:: new(protocol);
+    boot_info.kernel_phys_base = phys_load;
 
     match protocol {
         BootProtocol::DeviceTree => {
             boot_info.dtb_phys_addr = x0;
-            // TODO: Parse DTB, set up page tables, jump to kernel
             super::dtb::handle_devicetree_boot(&mut boot_info, x0);
         }
-        BootProtocol::UEFI => {
+        BootProtocol:: UEFI => {
             boot_info.uefi_system_table = x1;
-            // TODO:  UEFI boot handling
             super::uefi::handle_uefi_boot(&mut boot_info, x0, x1);
         }
         _ => {
-            panic!("Unsupported boot protocol:  {: ?}", protocol);
+            panic! ("Unsupported boot protocol:  {:?}", protocol);
         }
     }
 
-    // Jump to kernel (needs implementation)
     panic!("Bootloader:  kernel entry not implemented yet!");
 }

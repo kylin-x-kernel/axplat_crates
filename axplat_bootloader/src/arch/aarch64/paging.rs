@@ -1,6 +1,6 @@
 //! AArch64 page table setup (simple linear mapping)
 
-use crate::memory: :{PhysAddr, VirtAddr, LINEAR_MAP_OFFSET, PAGE_SIZE_1G};
+use crate::memory::{PhysAddr, VirtAddr, LINEAR_MAP_OFFSET, PAGE_SIZE_1G};
 
 /// Set up simple linear mapping page tables
 ///
