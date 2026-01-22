@@ -122,23 +122,23 @@ ap_entry64:
 .balign 4096
 .Ltmp_pml4:
     # 0x0000_0000 ~ 0x7f_ffff_ffff (512 GiB)
-    .quad .Ltmp_pdpt_low - {offset} + 0x3   # PRESENT | WRITABLE | paddr(tmp_pdpt)
+    .quad .Ltmp_pdpt_low - {offset} + 0x3 + {cbit}   # PRESENT | WRITABLE | paddr(tmp_pdpt)
     .zero 8 * 255
     # 0xffff_8000_0000_0000 ~ 0xffff_807f_ffff_ffff (512 GiB)
-    .quad .Ltmp_pdpt_high - {offset} + 0x3  # PRESENT | WRITABLE | paddr(tmp_pdpt)
+    .quad .Ltmp_pdpt_high - {offset} + 0x3 + {cbit}  # PRESENT | WRITABLE | paddr(tmp_pdpt)
     .zero 8 * 255
 
 # FIXME: may not work on macOS using hvf as the CPU does not support 1GB page (pdpe1gb)
 .Ltmp_pdpt_low:
 .set i, 0
 .rept 512
-    .quad 0x40000000 * i | 0x83  # PRESENT | WRITABLE | HUGE_PAGE | paddr(0x4000_0000 * i)
+    .quad 0x40000000 * i | 0x83 | {cbit}  # PRESENT | WRITABLE | HUGE_PAGE | paddr(0x4000_0000 * i)
     .set i, i + 1
 .endr
 
 .Ltmp_pdpt_high:
 .set i, 0
 .rept 512
-    .quad 0x40000000 * i | 0x83  # PRESENT | WRITABLE | HUGE_PAGE | paddr(0x4000_0000 * i)
+    .quad 0x40000000 * i | 0x83 | {cbit}  # PRESENT | WRITABLE | HUGE_PAGE | paddr(0x4000_0000 * i)
     .set i, i + 1
 .endr

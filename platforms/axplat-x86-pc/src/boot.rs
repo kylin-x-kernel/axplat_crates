@@ -31,6 +31,7 @@ const CR4: u64 = Cr4Flags::PHYSICAL_ADDRESS_EXTENSION.bits()
         0
     };
 const EFER: u64 = EferFlags::LONG_MODE_ENABLE.bits() | EferFlags::NO_EXECUTE_ENABLE.bits();
+const SEV_CBIT: u64 = 1u64 << 47;
 
 #[unsafe(link_section = ".bss.stack")]
 static mut BOOT_STACK: [u8; BOOT_STACK_SIZE] = [0; BOOT_STACK_SIZE];
@@ -51,4 +52,5 @@ global_asm!(
     cr4 = const CR4,
     efer_msr = const x86::msr::IA32_EFER,
     efer = const EFER,
+    cbit = const SEV_CBIT,
 );
