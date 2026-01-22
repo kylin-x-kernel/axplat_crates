@@ -38,8 +38,9 @@ boot-stack-size = 0x40000                       # uint
 [devices]
 # MMIO ranges with format (`base_paddr`, `size`).
 mmio-ranges = [
-    [0x8000_0000, 0x7e00_0000], # PCI MMIO window
+    [0x8000_0000, 0x3000_0000], # PCI MMIO window (lower)
     [0xb000_0000, 0x1000_0000], # PCI config space
+    [0xc000_0000, 0x3e00_0000], # PCI MMIO window (upper)
     [0xfe00_0000, 0xc0_0000],   # PCI devices
     [0xfec0_0000, 0x1000],      # IO APIC
     [0xfed0_0000, 0x1000],      # HPET
