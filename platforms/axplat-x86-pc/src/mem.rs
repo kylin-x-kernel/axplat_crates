@@ -5,11 +5,6 @@ use heapless::Vec;
 use lazyinit::LazyInit;
 use multiboot::information::{MemoryManagement, MemoryType, Multiboot, PAddr};
 
-#[cfg(feature = "paging")]
-use axplat::mem::PAGE_SIZE_4K;
-#[cfg(feature = "paging")]
-use axplat::paging::MappingFlags;
-
 use crate::config::devices::MMIO_RANGES;
 use crate::config::plat::PHYS_VIRT_OFFSET;
 
@@ -82,23 +77,5 @@ impl MemIf for MemIfImpl {
             va!(crate::config::plat::KERNEL_ASPACE_BASE),
             crate::config::plat::KERNEL_ASPACE_SIZE,
         )
-    }
-
-    #[cfg(feature = "paging")]
-    fn mark_uncached(vaddr: VirtAddr, size: usize) {
-        // Update PTE flags in the currently active kernel page table.
-        //
-        // For x86_64 + SEV, setting UNCACHED also clears SEV C-bit in our PTE
-        // implementation (`sev_cbit_for`).
-        let start = vaddr.as_usize() & !(PAGE_SIZE_4K - 1);
-        let end = (vaddr.as_usize() + size + PAGE_SIZE_4K - 1) & !(PAGE_SIZE_4K - 1);
-        if end <= start {
-            return;
-        }
-        let len = end - start;
-
-        let flags = MappingFlags::READ | MappingFlags::WRITE | MappingFlags::UNCACHED;
-        axplat::paging::protect_region(va!(start), len, flags);
-        axcpu::asm::flush_tlb(None);
     }
 }

@@ -158,16 +158,6 @@ pub trait MemIf {
 
     /// Returns the kernel address space base virtual address and size.
     fn kernel_aspace() -> (VirtAddr, usize);
-
-    /// Mark the given virtual address range as **uncached**.
-    ///
-    /// This is primarily used for DMA buffers under confidential computing
-    /// technologies (e.g., AMD SEV) where software may need to adjust page
-    /// attributes so the device can access memory correctly.
-    fn mark_uncached(_vaddr: VirtAddr, _size: usize) {
-        // Default implementation: do nothing.
-        // Platforms that support paging may override this.
-    }
 }
 
 /// Returns the total size of physical memory (RAM) on the platform.

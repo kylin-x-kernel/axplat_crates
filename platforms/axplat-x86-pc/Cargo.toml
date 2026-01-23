@@ -18,7 +18,6 @@ rtc = ["x86_rtc"]
 smp = ["axplat/smp", "kspin/smp"]
 reboot-on-system-off = []
 sev = []
-paging = []
 
 [dependencies]
 kspin = "0.1"
