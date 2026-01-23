@@ -5,6 +5,9 @@ use heapless::Vec;
 use lazyinit::LazyInit;
 use multiboot::information::{MemoryManagement, MemoryType, Multiboot, PAddr};
 
+use axplat::mem::PAGE_SIZE_4K;
+use page_table_multiarch::MappingFlags;
+
 use crate::config::devices::MMIO_RANGES;
 use crate::config::plat::PHYS_VIRT_OFFSET;
 
@@ -77,5 +80,38 @@ impl MemIf for MemIfImpl {
             va!(crate::config::plat::KERNEL_ASPACE_BASE),
             crate::config::plat::KERNEL_ASPACE_SIZE,
         )
+    }
+
+    fn mark_uncached(vaddr: VirtAddr, size: usize) {
+        // Update PTE flags in the currently active kernel page table.
+        //
+        // We intentionally do this at the platform layer to avoid pulling in
+        // axmm (which would create a dependency cycle with axdriver/axfs).
+        //
+        // For x86_64 + SEV, setting UNCACHED also clears SEV C-bit in our PTE
+        // implementation (`sev_cbit_for`).
+        let start = vaddr.as_usize() & !(PAGE_SIZE_4K - 1);
+        let end = (vaddr.as_usize() + size + PAGE_SIZE_4K - 1) & !(PAGE_SIZE_4K - 1);
+        if end <= start {
+            return;
+        }
+        let len = end - start;
+
+        let mut pt = axhal::paging::PageTable::try_new().expect("alloc temp pagetable failed");
+        // Rebind the temporary PageTable to current CR3 root so we can modify
+        // the active kernel mappings.
+        // This relies on PageTable's layout being (root_paddr, ..) in the
+        // upstream page_table_multiarch implementation.
+        let root = axcpu::asm::read_kernel_page_table();
+        unsafe {
+            let pt_ptr = &mut pt as *mut _ as *mut memory_addr::PhysAddr;
+            *pt_ptr = root;
+        }
+
+        let flags = MappingFlags::READ | MappingFlags::WRITE | MappingFlags::UNCACHED;
+        let _ = pt
+            .modify()
+            .protect_region(start.into(), len, flags);
+        axcpu::asm::flush_tlb(None);
     }
 }
